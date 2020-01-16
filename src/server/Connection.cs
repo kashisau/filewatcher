@@ -31,26 +31,38 @@ namespace filewatcher {
       this.rsyncServer = rsyncServer;
     }
 
+    // Maintains a connection to the server, retrying on failure.
     public async Task Connect(CancellationToken stoppingToken)
     {
-        await Task.Run(async () => {
-          try 
-              {
-                  client = new TcpClient(server, port);
-                  stream = client.GetStream();
-
-                  await Identify();
-                  await GetFileList();
-                  
-                  stream.Close();         
-                  client.Close();         
-              } 
-              catch (Exception e) 
-              {
-                  logger.LogError($"Error from stream: {e}");
-              }
-        });
+        while ( ! stoppingToken.IsCancellationRequested)
+        {
+            await TryConnection();
+            await Task.Delay(1000);
+        }
     }
+
+    public async Task TryConnection()
+    {
+        try 
+        {
+            client = new TcpClient(server, port);
+            stream = client.GetStream();
+
+            await Identify();
+            await GetFileList();
+            
+            stream.Close();         
+            client.Close();         
+        } 
+        catch (SocketException se) 
+        {
+            if (se.Message.IndexOf("Connection refused") == 0) {
+                logger.LogError($"Error connecting to server {server} on port {port}.");
+                return;
+            }
+            logger.LogError($"Error connecting to server {server} on port {port}. Error: {se.Message}");
+        }
+      }
 
     async Task Identify()
     {
@@ -72,7 +84,7 @@ namespace filewatcher {
     {
         try
         {
-            await Task.Run(() => {
+            await Task.Run(async () => {
               // Bytes Array to receive Server Response.
               BinaryFormatter formatter = new BinaryFormatter();
               var serverFiles = (ServerFiles) formatter.Deserialize(stream);
@@ -80,34 +92,15 @@ namespace filewatcher {
               logger.LogInformation($"Recieved from server: {clientList.Count} files.");
               
               string path = serverFiles.ServerPath;
-              // string remoteFilePathString = clientList.Last();
-              clientList.ForEach((remoteFilePathString) => {
-                  logger.LogInformation($"Recieved from server: path: {path}. Remote file: {remoteFilePathString}.");
+              string remoteFilePathString = clientList.Last();
+              remoteFilePathString = clientList[1];
+              // clientList.ForEach(async (remoteFilePathString) => {
                   FilePath filePath = new FilePath(remoteFilePathString, path);
                   string localPath = downloadPath + filePath.Relative;
                   FilePath.CreateDirectoryPath(localPath, logger);
-                  var rsyncCommand = $"rsync --progress -c --append -e ssh {rsyncServer}:\"'{filePath.Absolute}'\" \"{downloadPath}{filePath.Relative}\"";
-                  // logger.LogInformation(rsyncCommand);
-                  
-                  var escapedArgs = rsyncCommand.Replace("\"", "\\\"");
-                
-                  var process = new Process()
-                  {
-                      StartInfo = new ProcessStartInfo
-                      {
-                          FileName = "/bin/bash",
-                          Arguments = $"-c \"{escapedArgs}\"",
-                          RedirectStandardOutput = true,
-                          UseShellExecute = false,
-                          CreateNoWindow = true,
-                      }
-                  };
-                  process.Start();
-                  string result = process.StandardOutput.ReadToEnd();
-                  process.WaitForExit();
-                  logger.LogInformation(result);
-                  logger.LogInformation($"Exit code: {process.ExitCode}");
-              });
+                  var download = new Download(remoteFilePathString, localPath, rsyncServer, logger);
+                  await download.StartDownload(new CancellationToken());
+              // });
             });
         } catch (Exception e) {
           logger.LogError($"Error during GetFileList: {e}");
