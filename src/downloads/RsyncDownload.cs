@@ -69,9 +69,9 @@ namespace filewatcher
                     }
 
                     // Progress reporting
-                    if (RsyncOutputRegExConstants.OutProgress.IsMatch(stdOut))
+                    if (RsyncOutputRegexConstants.OutProgress.IsMatch(stdOut))
                     {
-                        Match outCompletedMatch = RsyncOutputRegExConstants.OutProgress.Match(stdOut);
+                        Match outCompletedMatch = RsyncOutputRegexConstants.OutProgress.Match(stdOut);
                         Int32 currentFileSize = Int32.Parse(
                             outCompletedMatch.Groups["currentFileSize"].Value,
                             NumberStyles.Integer
@@ -86,9 +86,9 @@ namespace filewatcher
                     }
 
                     // Completion summary
-                    if (RsyncOutputRegExConstants.OutCompletedSummary.IsMatch(stdOut))
+                    if (RsyncOutputRegexConstants.OutCompletedSummary.IsMatch(stdOut))
                     {
-                        Match outCompletedMatch = RsyncOutputRegExConstants.OutCompletedSummary.Match(stdOut);
+                        Match outCompletedMatch = RsyncOutputRegexConstants.OutCompletedSummary.Match(stdOut);
                         Int32 fileSize = Int32.Parse(
                             outCompletedMatch.Groups["fileSize"].Value,
                             NumberStyles.Integer
@@ -121,16 +121,16 @@ namespace filewatcher
                     }
 
                     // SSH error
-                    if (RsyncOutputRegExConstants.ErrSshConnection.IsMatch(stdErr))
+                    if (RsyncOutputRegexConstants.ErrSshConnection.IsMatch(stdErr))
                     {
-                        Match outCompletedMatch = RsyncOutputRegExConstants.ErrSshConnection.Match(stdErr);
+                        Match outCompletedMatch = RsyncOutputRegexConstants.ErrSshConnection.Match(stdErr);
                         return;
                     }
 
                     // Rsync error with filesize
-                    if (RsyncOutputRegExConstants.ErrRsyncConnectionClosed.IsMatch(stdErr))
+                    if (RsyncOutputRegexConstants.ErrRsyncConnectionClosed.IsMatch(stdErr))
                     {
-                        Match outCompletedMatch = RsyncOutputRegExConstants.ErrRsyncConnectionClosed.Match(stdErr);
+                        Match outCompletedMatch = RsyncOutputRegexConstants.ErrRsyncConnectionClosed.Match(stdErr);
                         Int32 bytesRecived = Int32.Parse(
                             outCompletedMatch.Groups["bytesRecived"].Value,
                             NumberStyles.Integer
@@ -203,7 +203,7 @@ namespace filewatcher
         };
   }
 
-  public static class RsyncOutputRegExConstants
+  public static class RsyncOutputRegexConstants
   {
       public readonly static Regex OutProgress = new Regex(
             "^(?<currentFileSize>[\\d]+)\\s+(?<currentProgress>[\\d]+)%\\s+(?<currentSpeed>[\\d\\.]+)(?<currentSpeedUnits>[A-Z]B\\/s)\\s+(?<timeAliveTimespan>[\\d:]+)",

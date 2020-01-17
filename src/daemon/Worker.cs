@@ -27,9 +27,11 @@ namespace filewatcher
             string path = FilePath.RemoveTrailingSlash(_options.DownloadsPath);
             Int32 port = _options.Port;
 
-            _logger.LogInformation($"Connecting to {server}:{port}...", DateTimeOffset.Now);
-            var connection = new Connection(server, port, "filewatcher", path, rsyncServer, _logger);
-            await connection.Connect(stoppingToken);
+            // _logger.LogInformation($"Connecting to {server}:{port}...", DateTimeOffset.Now);
+            // var connection = new Connection(server, port, "filewatcher", path, rsyncServer, _logger);
+            // await connection.Connect(stoppingToken);
+            var fwdClient = new FilewatchedClient(server, port, rsyncServer, _logger);
+            await fwdClient.ConnectAsync(stoppingToken);
         }
     }
 }
