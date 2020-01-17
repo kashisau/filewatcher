@@ -20,6 +20,8 @@ namespace filewatcher {
     string clientID;
     TcpClient client;
     NetworkStream stream;
+
+    public bool? IsConnected;
     
     public Connection(string server, int port, string clientID, string downloadPath, string rsyncServer, ILogger logger)
     {
@@ -48,6 +50,9 @@ namespace filewatcher {
             client = new TcpClient(server, port);
             stream = client.GetStream();
 
+            IsConnected = true;
+            logger.LogInformation($"Connected to server {server} on port {port}.");
+
             await Identify();
             await GetFileList();
             
@@ -56,6 +61,8 @@ namespace filewatcher {
         } 
         catch (SocketException se) 
         {
+            if (IsConnected == false) return;
+            IsConnected = false;
             if (se.Message.IndexOf("Connection refused") == 0) {
                 logger.LogError($"Error connecting to server {server} on port {port}.");
                 return;

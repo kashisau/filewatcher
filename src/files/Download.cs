@@ -34,6 +34,11 @@ namespace filewatcher
       rsyncWorker = new BackgroundWorker();
       rsyncWorker.WorkerReportsProgress = true;
       rsyncWorker.RunWorkerCompleted += RsyncWorkerCompleted;
+      rsyncWorker.ProgressChanged += new ProgressChangedEventHandler(
+        (Object o, ProgressChangedEventArgs e) => {
+            _logger.LogInformation($"Downloading {Path.GetFileName(localPath)}: {e.ProgressPercentage}%");
+        }
+      );
       rsyncWorker.DoWork += LaunchRsyncWork;
       rsyncWorker.RunWorkerAsync();
 
@@ -89,17 +94,20 @@ namespace filewatcher
     {
         // regex: [\d]+[\s]+([\d]*)%
         string rsyncOutput = e.Data;
-        var progressMatches = rsyncProgressRx.Match(rsyncOutput);
-        if ( ! progressMatches.Success) return;
-        int percent = Int32.Parse(progressMatches.Groups["percentage"].Value);
-        if (percent == PercentDownloaded) return;
-        
-        this.PercentDownloaded = percent;
-        rsyncWorker.ReportProgress(percent);
-        _logger.LogInformation($"Downloading {Path.GetFileName(localPath)}: {percent}%");
+        if (rsyncOutput != null)
+        {
+          var progressMatches = rsyncProgressRx.Match(rsyncOutput);
+          if ( ! progressMatches.Success) return;
+          int percent = Int32.Parse(progressMatches.Groups["percentage"].Value);
+          if (percent == PercentDownloaded) return;
+          this.PercentDownloaded = percent;
+          rsyncWorker.ReportProgress(percent);
+        }
     }
     private void RsyncProcessErrorDataReceived(object sender, DataReceivedEventArgs e)
     {
+        string rsyncOutput = e.Data;
+        if (rsyncOutput == null) return;
         if (rsyncProcess.HasExited && rsyncProcess.ExitCode == 0) {
             rsyncProcess.Close();
             return;
