@@ -105,8 +105,9 @@ namespace filewatcher {
                   FilePath filePath = new FilePath(remoteFilePathString, path);
                   string localPath = downloadPath + filePath.Relative;
                   FilePath.CreateDirectoryPath(localPath, logger);
-                  var download = new Download(remoteFilePathString, localPath, rsyncServer, logger);
-                  await download.StartDownload(new CancellationToken());
+                  var download = new RsyncDownload(remoteFilePathString, localPath, rsyncServer, logger);
+                  DownloadResult downloadResult = await download.DownloadAsync(new CancellationToken());
+                  logger.LogInformation($"Download result: {downloadResult.DownloadState}");
               // });
             });
         } catch (Exception e) {
