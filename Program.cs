@@ -12,7 +12,9 @@ namespace filewatcher
     {
         public static void Main(string[] args)
         {
-            CreateHostBuilder(args).Build().Run();
+            try {
+                CreateHostBuilder(args).Build().Run();
+            } catch (OperationCanceledException) {}
         }
 
         public static IHostBuilder CreateHostBuilder(string[] args) =>

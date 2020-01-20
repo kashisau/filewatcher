@@ -52,6 +52,8 @@ namespace filewatcher
                 await Task.WhenAll(remoteFiles);
 
                 // Start watching for new files
+                logger.LogInformation($"All files downloaded!!!! Waiting for new files...");
+                await downloadManager.WatchForNewFiles(clientStream);
             }
             return;
         }

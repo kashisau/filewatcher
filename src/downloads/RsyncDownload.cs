@@ -177,7 +177,7 @@ namespace filewatcher
               try 
               {
                   rsyncProcess.Kill();
-              } catch (InvalidOperationException ioe)
+              } catch (InvalidOperationException)
               {}
               downloadResult = GetDownloadResult();
             });

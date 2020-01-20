@@ -39,9 +39,9 @@ namespace filewatcher
             );
             return downloadTasks;
         }
-        Task WatchForNewFiles(NetworkStream fwdStream)
+        public Task WatchForNewFiles(NetworkStream fwdStream)
         {
-            return null;
+            return Task.Delay(100000);
         }
     }
 }
