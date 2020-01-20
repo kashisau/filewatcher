@@ -8,6 +8,6 @@ namespace filewatcher
         int? GetProgress();
         DownloadState GetState();
         DownloadResult GetDownloadResult();
-        Task<DownloadResult> DownloadAsync(CancellationToken dlCancellationToken);
+        Task<DownloadResult> DownloadAsync(CancellationToken dlCancellationToken, SemaphoreSlim semaphore = null);
     }
 }

@@ -18,7 +18,15 @@ namespace filewatcher
     readonly string rsyncServer;
     readonly ILogger logger;
     CancellationToken dlCancellationToken;
+    DownloadResult downloadResult;
     
+    /// <summary>Initialises a download (IDownload interface), without starting
+    /// the download.</summary>
+    /// <param name="remotePath">The path on the remote machine to copy from (absolute).</param>
+    /// <param name="localPath">The path on the local machine to copy to (relative or absolute).</param>
+    /// <param name="rsyncServer">The connection string for `rsync` to use to
+    /// connect to the remote server.</param>
+    /// <param name="logger">An output to log debug and issue logging.</param>
     public RsyncDownload(string remotePath, string localPath, string rsyncServer, ILogger logger = null)
     {
         this.remotePath = remotePath;
@@ -32,20 +40,18 @@ namespace filewatcher
     public int? GetProgress() => progress;
     public DownloadState GetState() => state;
 
-    public async Task<DownloadResult> DownloadAsync(CancellationToken dlCancellationToken)
+    public async Task<DownloadResult> DownloadAsync(CancellationToken dlCancellationToken, SemaphoreSlim semaphore = null)
     {
         this.dlCancellationToken = dlCancellationToken;
         using (var rsyncProcess = new Process())
         {
             // Queue up the rsync process...
             rsyncProcess.StartInfo.FileName = "rsync";
-            rsyncProcess.StartInfo.Arguments = $" --progress -z -c --append -e ssh {rsyncServer}:\"'{remotePath}'\" \"{localPath}\"";
+            rsyncProcess.StartInfo.Arguments = $" --partial --progress -z -c --append -e ssh {rsyncServer}:\"'{remotePath}'\" \"{localPath}\"";
             rsyncProcess.StartInfo.UseShellExecute = false;
             rsyncProcess.StartInfo.RedirectStandardOutput = true;
             rsyncProcess.StartInfo.RedirectStandardError = true;
             rsyncProcess.StartInfo.CreateNoWindow = true;
-
-            logger.LogInformation(rsyncProcess.StartInfo.Arguments);
 
             // rsync output handling
             var outputCloseTask = new TaskCompletionSource<bool>();
@@ -62,7 +68,7 @@ namespace filewatcher
                     if (stdOut == "") return;
 
                     // Initialisation
-                    if (stdOut == FilePath.GetFilename(remotePath))
+                    if (stdOut == FilePath.GetFilename(localPath))
                     {
                         state = DownloadState.Downloading;
                         return;
@@ -111,7 +117,7 @@ namespace filewatcher
                     }
                     var stdErr = eventArgs.Data;
                     
-                    logger.LogInformation($"StdErr: {stdErr}");
+                    // logger.LogWarning($"StdErr: {stdErr}");
 
                     // File identified
                     if (stdErr == FilePath.GetFilename(remotePath))
@@ -124,6 +130,14 @@ namespace filewatcher
                     if (RsyncOutputRegexConstants.ErrSshConnection.IsMatch(stdErr))
                     {
                         Match outCompletedMatch = RsyncOutputRegexConstants.ErrSshConnection.Match(stdErr);
+                        logger.LogWarning($"SSH connection broken, retrying {remotePath}");
+                        return;
+                    }
+
+                    // Rsync cancelled by user
+                    if (RsyncOutputRegexConstants.ErrRsyncCancelled.IsMatch(stdErr))
+                    {
+                        logger.LogWarning($"Rsync exited for {remotePath}");
                         return;
                     }
 
@@ -141,9 +155,41 @@ namespace filewatcher
                 }
             );
 
+            // Resolve to a DownloadResult
+            rsyncProcess.Exited += new EventHandler(
+                (sender, eventArgs) => {
+                    if (rsyncProcess.ExitCode == 0)
+                    {
+                        state = DownloadState.Complete;
+                        progress = 100;
+                    }
+
+                    // Work complete, update the semaphore
+                    if (semaphore != null) semaphore.Release();
+                    if (state == DownloadState.Complete) logger.LogInformation($"{state} {localPath}");
+                    else logger.LogWarning($"{state} {localPath}");
+
+                    downloadResult = GetDownloadResult();
+                }
+            );
+
+            dlCancellationToken.Register(() => {
+              try 
+              {
+                  rsyncProcess.Kill();
+              } catch (InvalidOperationException ioe)
+              {}
+              downloadResult = GetDownloadResult();
+            });
+
+            // Wait here if there's a semaphore throttling downloads.
+            if (semaphore != null) await semaphore.WaitAsync();
+
+            logger.LogInformation($"Starting {localPath}");
+
             bool isStarted = rsyncProcess.Start();
             if ( ! isStarted) {
-                return new DownloadResult() {
+                downloadResult = new DownloadResult() {
                     Progress = 0,
                     ExitCode = rsyncProcess.ExitCode,
                     DownloadState = DownloadState.Error
@@ -156,41 +202,13 @@ namespace filewatcher
 
             var rsyncProcessRunTask = Task.Run(() => rsyncProcess.WaitForExit());
 
-            var rsyncProcessTasks = Task.WhenAll(
+            await Task.WhenAll(
                 rsyncProcessRunTask,
                 outputCloseTask.Task,
                 errorCloseTask.Task
             );
 
-            while ( ! dlCancellationToken.IsCancellationRequested)
-            {
-                if (rsyncProcessRunTask.IsCompleted) {
-                  switch (rsyncProcessRunTask.Status)
-                  {
-                      case TaskStatus.RanToCompletion:
-                          state = DownloadState.Complete;
-                          progress = 100;
-                          break;
-                      case TaskStatus.Canceled:
-                          state = DownloadState.Cancelled;
-                          break;
-                      default:
-                          state = DownloadState.Error;
-                          break;
-                  }
-                  return GetDownloadResult();
-                }
-                await Task.Delay(200);
-            }
-            
-            return new DownloadResult()
-                {
-                    Progress = progress,
-                    DownloadState = DownloadState.Cancelled,
-                    LocalPath = localPath,
-                    FileSize = fileSize
-                };
-
+            return downloadResult;
         }
     }
 
@@ -220,6 +238,10 @@ namespace filewatcher
           );
       public readonly static Regex ErrSshConnection = new Regex(
             "^packet_write_wait:\\s+Connection to (?<serverAddress>[0-9.]+)\\sport\\s(?<serverPort>[0-9]+):\\s+Broken\\spipe",
+            RegexOptions.Compiled
+          );
+      public readonly static Regex ErrRsyncCancelled = new Regex(
+            "^rsync\\serror:\\s+received\\sSIGINT,\\sSIGTERM,\\sor\\sSIGHUP\\s+\\(code\\s(?<errorCode>\\d+)\\)",
             RegexOptions.Compiled
           );
       public readonly static Regex ErrRsyncConnectionClosed = new Regex(

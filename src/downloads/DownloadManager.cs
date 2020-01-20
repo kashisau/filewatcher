@@ -22,20 +22,22 @@ namespace filewatcher
             this.logger = logger;
             this.maxSimultaneous = maxSimultaneous;
             
-            semaphore = new SemaphoreSlim(0, maxSimultaneous);
+            semaphore = new SemaphoreSlim(maxSimultaneous);
         }
 
-        public List<string> InitialSync(List<FilePath> fwdFileList)
+        public List<Task<DownloadResult>> InitialSyncAsync(List<FilePath> fwdFileList, CancellationToken cancellationToken)
         {
+            List<Task<DownloadResult>> downloadTasks = new List<Task<DownloadResult>>();
+
             fwdFileList.ForEach(
               fwdRemoteFile => {
                   string localPath = destinationPath + fwdRemoteFile.Relative;
-                  // FilePath.CreateDirectoryPath(localPath, logger);
+                  FilePath.CreateDirectoryPath(localPath, logger);
                   var download = new RsyncDownload(fwdRemoteFile.Absolute, localPath, rsyncServer, logger);
-                  // DownloadResult downloadResult = await download.DownloadAsync(new CancellationToken());
-                  // logger.LogInformation($"Download result: {downloadResult.DownloadState}");
+                  downloadTasks.Add(download.DownloadAsync(cancellationToken, semaphore));
               }
             );
+            return downloadTasks;
         }
         Task WatchForNewFiles(NetworkStream fwdStream)
         {

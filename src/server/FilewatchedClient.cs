@@ -14,15 +14,17 @@ namespace filewatcher
     {
         readonly ILogger logger;
         readonly string server;
+        readonly string downloadPath;
         readonly Int32 port;
         readonly string rsyncHost;
         NetworkStream clientStream;
 
         string fwdServerPath;
-        public FilewatchedClient(string fileWatchedServer, Int32 filewatchedPort, string rsyncHost, ILogger logger)
+        public FilewatchedClient(string fileWatchedServer, Int32 filewatchedPort, string downloadPath, string rsyncHost, ILogger logger)
         {
             this.server = fileWatchedServer;
             this.port = filewatchedPort;
+            this.downloadPath = downloadPath;
             this.rsyncHost = rsyncHost;
             this.logger = logger;
         }
@@ -43,8 +45,11 @@ namespace filewatcher
                 // Get list of files
                 clientStream = await Connect();
                 var fwdServerFiles = GetFileListAsync(clientStream);
+                DownloadManager downloadManager = new DownloadManager(downloadPath, rsyncHost, logger);
 
                 // Download or verify existing files
+                List<Task<DownloadResult>> remoteFiles = downloadManager.InitialSyncAsync(fwdServerFiles, cancellationToken);
+                await Task.WhenAll(remoteFiles);
 
                 // Start watching for new files
             }
