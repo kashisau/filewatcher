@@ -17,15 +17,18 @@ namespace filewatcher
         readonly string downloadPath;
         readonly Int32 port;
         readonly string rsyncHost;
+        TcpClient fwdTcpClient;
         NetworkStream clientStream;
+        CancellationToken cancellationToken;
 
         string fwdServerPath;
-        public FilewatchedClient(string fileWatchedServer, Int32 filewatchedPort, string downloadPath, string rsyncHost, ILogger logger)
+        public FilewatchedClient(string fileWatchedServer, Int32 filewatchedPort, string downloadPath, string rsyncHost, CancellationToken cancellationToken, ILogger logger)
         {
             this.server = fileWatchedServer;
             this.port = filewatchedPort;
             this.downloadPath = downloadPath;
             this.rsyncHost = rsyncHost;
+            this.cancellationToken = cancellationToken;
             this.logger = logger;
         }
         public void SetDestination(string localPath)
@@ -38,23 +41,20 @@ namespace filewatcher
 
         // This process needs to continue until the cancellationToken is 
         // activated.
-        public async Task ConnectAsync(CancellationToken cancellationToken)
+        public async Task ConnectAsync()
         {
-            while ( ! cancellationToken.IsCancellationRequested)
-            {
-                // Get list of files
-                clientStream = await Connect();
-                var fwdServerFiles = GetFileListAsync(clientStream);
-                DownloadManager downloadManager = new DownloadManager(downloadPath, rsyncHost, logger);
+            // Get list of files
+            clientStream = await Connect();
+            var fwdServerFiles = GetFileListAsync(clientStream);
+            DownloadManager downloadManager = new DownloadManager(downloadPath, rsyncHost, clientStream, cancellationToken, logger);
 
-                // Download or verify existing files
-                List<Task<DownloadResult>> remoteFiles = downloadManager.InitialSyncAsync(fwdServerFiles, cancellationToken);
-                await Task.WhenAll(remoteFiles);
+            // Download or verify existing files
+            List<Task<DownloadResult>> remoteFiles = downloadManager.InitialSyncAsync(fwdServerFiles);
+            await Task.WhenAll(remoteFiles);
 
-                // Start watching for new files
-                logger.LogInformation($"All files downloaded!!!! Waiting for new files...");
-                await downloadManager.WatchForNewFiles(clientStream);
-            }
+            // Start watching for new files
+            logger.LogInformation($"All files downloaded!!!! Exiting.");
+            // await downloadManager.WatchForNewFiles();
             return;
         }
 
@@ -62,7 +62,8 @@ namespace filewatcher
         {
             try
             {
-                TcpClient fwdTcpClient = new TcpClient(server, port);
+                fwdTcpClient = new TcpClient(server, port);
+                // TestConnectionLoop().ConfigureAwait(false);
                 NetworkStream stream = fwdTcpClient.GetStream();
                 if (RegisterFilewatcherClient(stream))
                 {
@@ -83,6 +84,29 @@ namespace filewatcher
                 }
             }
             return null;
+        }
+
+        async Task TestConnectionLoop()
+        {
+            Socket socket = fwdTcpClient.Client;
+            socket.NoDelay = true;
+
+            while ( ! cancellationToken.IsCancellationRequested)
+            {
+                try
+                {
+                    bool isConnected = !((socket.Poll(1000, SelectMode.SelectRead) && (socket.Available == 0)) || !socket.Connected);
+                    if ( ! isConnected) throw new SocketException();
+                    await Task.Delay(500);
+                }
+                catch (Exception e)
+                {
+                    // cancellationToken.Cancel();
+                    logger.LogWarning($"Disconnected: {e.Message}");
+                    // Others can listen to the Cancellation Token or you 
+                    // can do other actions here
+                }
+            }
         }
 
         bool RegisterFilewatcherClient(NetworkStream stream)

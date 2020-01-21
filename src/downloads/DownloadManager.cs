@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
@@ -14,18 +15,22 @@ namespace filewatcher
         readonly string destinationPath;
         readonly int maxSimultaneous;
         SemaphoreSlim semaphore;
+        CancellationToken cancellationToken;
+        NetworkStream fwdStream;
 
-        public DownloadManager(string destinationPath, string rsyncServer, ILogger logger, int maxSimultaneous = 2)
+        public DownloadManager(string destinationPath, string rsyncServer, NetworkStream fwdStream, CancellationToken cancellationToken, ILogger logger, int maxSimultaneous = 2)
         {
             this.destinationPath = destinationPath;
             this.rsyncServer = rsyncServer;
             this.logger = logger;
             this.maxSimultaneous = maxSimultaneous;
+            this.cancellationToken = cancellationToken;
+            this.fwdStream = fwdStream;
             
             semaphore = new SemaphoreSlim(maxSimultaneous);
         }
 
-        public List<Task<DownloadResult>> InitialSyncAsync(List<FilePath> fwdFileList, CancellationToken cancellationToken)
+        public List<Task<DownloadResult>> InitialSyncAsync(List<FilePath> fwdFileList)
         {
             List<Task<DownloadResult>> downloadTasks = new List<Task<DownloadResult>>();
 
@@ -39,7 +44,7 @@ namespace filewatcher
             );
             return downloadTasks;
         }
-        public Task WatchForNewFiles(NetworkStream fwdStream)
+        public Task WatchForNewFiles()
         {
             return Task.Delay(100000);
         }

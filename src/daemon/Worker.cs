@@ -27,8 +27,8 @@ namespace filewatcher
             string localDownloadsPath = FilePath.RemoveTrailingSlash(_options.DownloadsPath);
             Int32 port = _options.Port;
 
-            var fwdClient = new FilewatchedClient(server, port, localDownloadsPath, rsyncServer, _logger);
-            await fwdClient.ConnectAsync(stoppingToken);
+            var fwdClient = new FilewatchedClient(server, port, localDownloadsPath, rsyncServer, stoppingToken, _logger);
+            await fwdClient.ConnectAsync();
         }
     }
 }

@@ -56,7 +56,7 @@ namespace filewatcher
           if (logger == null) return null;
           logger.LogError($"The path '{directoryPath}' is invalid. {dnfE}.");
       }
-      catch (IOException ioE)
+      catch (IOException)
       {
           if (logger == null) return null;
           logger.LogError($"The path '{directoryPath}' is an existing file.");
