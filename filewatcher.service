@@ -1,0 +1,12 @@
+[Unit]
+Description=filewatcher daemon
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+ExecStart=/usr/sbin/filewatcher
+WorkingDirectory=/etc/filewatcher
+
+[Install]
+WantedBy=multi-user.target
