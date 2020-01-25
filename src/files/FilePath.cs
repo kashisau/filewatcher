@@ -22,7 +22,7 @@ namespace filewatcher
 
     public static string RemoveTrailingSlash(string path)
     {
-      return path.Trim('/');
+      return path.TrimEnd('/');
     }
 
 

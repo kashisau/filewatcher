@@ -47,7 +47,7 @@ namespace filewatcher
         {
             // Queue up the rsync process...
             rsyncProcess.StartInfo.FileName = "rsync";
-            rsyncProcess.StartInfo.Arguments = $" --partial --progress -z -c --append -e ssh {rsyncServer}:\"'{remotePath}'\" \"{localPath}\"";
+            rsyncProcess.StartInfo.Arguments = $" --partial --progress -z -c --append -e ssh {rsyncServer}:\"{remotePath}\" \"{localPath}\"";
             rsyncProcess.StartInfo.UseShellExecute = false;
             rsyncProcess.StartInfo.RedirectStandardOutput = true;
             rsyncProcess.StartInfo.RedirectStandardError = true;
@@ -117,7 +117,7 @@ namespace filewatcher
                     }
                     var stdErr = eventArgs.Data;
                     
-                    // logger.LogWarning($"StdErr: {stdErr}");
+                    logger.LogWarning($"StdErr: {stdErr}");
 
                     // File identified
                     if (stdErr == FilePath.GetFilename(remotePath))
@@ -167,7 +167,7 @@ namespace filewatcher
                     // Work complete, update the semaphore
                     if (semaphore != null) semaphore.Release();
                     if (state == DownloadState.Complete) logger.LogInformation($"{state} {localPath}");
-                    else logger.LogWarning($"{state} {localPath}");
+                    else logger.LogWarning($"{eventArgs} {localPath}");
 
                     downloadResult = GetDownloadResult();
                 }
