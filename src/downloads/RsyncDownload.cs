@@ -47,11 +47,13 @@ namespace filewatcher
         {
             // Queue up the rsync process...
             rsyncProcess.StartInfo.FileName = "rsync";
-            rsyncProcess.StartInfo.Arguments = $" --partial --progress -z -c --append -e ssh {rsyncServer}:\"{remotePath}\" \"{localPath}\"";
+            rsyncProcess.StartInfo.Arguments = $" --partial --progress -z -c --append -e ssh {rsyncServer}:\"'{remotePath}'\" \"{localPath}\"";
             rsyncProcess.StartInfo.UseShellExecute = false;
             rsyncProcess.StartInfo.RedirectStandardOutput = true;
             rsyncProcess.StartInfo.RedirectStandardError = true;
             rsyncProcess.StartInfo.CreateNoWindow = true;
+
+            logger.LogInformation($"Fetching file with: `{rsyncProcess.StartInfo.Arguments}`");
 
             // rsync output handling
             var outputCloseTask = new TaskCompletionSource<bool>();

@@ -4,7 +4,7 @@
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <OutputType>Exe</OutputType>
     <PublishReadyToRun>true</PublishReadyToRun>
-    <PublishSingleFile>true</PublishSingleFile>
+    <!-- <PublishSingleFile>true</PublishSingleFile> -->
     <PublishReadyToRunShowWarnings>true</PublishReadyToRunShowWarnings>
     <UserSecretsId>dotnet-filewatcher-DDDFBCAF-9677-4354-BA0A-5FF35A129162</UserSecretsId>
   </PropertyGroup>
